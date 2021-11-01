@@ -72,7 +72,7 @@ for tag, start in itertools.product(tags, list(range(0, 1020, 20))):
 print('Number of URLs to scrap: {}'.format(len(urls)))
 
 with ThreadPoolExecutor(max_workers=20) as ex:
-    res = list(ex.map(get_books_from_single_page, urls[:2000]))
+    res = list(ex.map(get_books_from_single_page, urls[:3000]))
 
 for r in res:
     lst_books.extend(r)
