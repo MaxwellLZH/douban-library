@@ -2,11 +2,10 @@ from pathlib import Path
 import os
 import json
 import requests
+import re
 from bs4 import BeautifulSoup
-from fake_useragent import UserAgent
 from concurrent.futures import ThreadPoolExecutor
 
-ua = UserAgent()
 
 data_path = Path(__file__).parent.parent / 'data'
 try:
@@ -35,8 +34,13 @@ headers = {
 
 def get_single_book_detail(d: dict):
     url = d['url']
+
+    # 解析tag
+    tag = re.split(r'(tag/|\?)', d['from_url'])[2]
+
     resp = requests.get(url, headers=headers, allow_redirects=False)
     soup = BeautifulSoup(resp.text)
+    print(soup)
     # 基本信息
     div_info = soup.find('div', id='info')
     lst_info = list(div_info.stripped_strings)
@@ -58,48 +62,41 @@ def get_single_book_detail(d: dict):
     # for i in range(len(lst_info) // 2):
     #     dict_info[lst_info[2 * i].rstrip(':')] = lst_info[2 * i +1]
 
-    print(lst_info)
-    print(dict_info)
-
     # 简介
     intro = soup.find('div', class_='intro').text.strip()
     # 短评
     div_comment = soup.find('div', id='comment-list-wrapper')
     lst_comment = [i.text.strip() for i in div_comment.findAll('p', class_='comment-content')]
-    detail = {'info_html': str(div_info),
-              'intro': intro,
+
+    detail = {'intro': intro,
+              'tag': tag,
               'short_comment': lst_comment}
     detail.update(**dict_info)
     print('Successfully downloaded book:', d['name'])
     return {**d, **detail}
 
 
-d = {'url': 'https://book.douban.com/subject/4913064/', 'name': 'x'}
-print(get_single_book_detail(d))
+if __name__ == '__main__':
 
+    with open(book_list_path, 'r') as f:
+        lst_books = json.load(f)
+    lst_id = [i['id'] for i in lst_books]
 
-#
-# with open(book_list_path, 'r') as f:
-#     lst_books = json.load(f)
-# lst_id = [i['id'] for i in lst_books]
-#
-#
-# if os.path.exists(file_path):
-#     with open(file_path, 'w') as f:
-#         lst_book_detail = json.load(f)
-#         downloaded_id = set([i['id'] for i in lst_book_detail])
-# else:
-#     downloaded_id = set()
-#     lst_book_detail = []
-#
-# tasks = [b for b in lst_books if b['id'] not in downloaded_id]
-# print('Remaining task count:', len(tasks))
-#
-#
-# with ThreadPoolExecutor(max_workers=20) as ex:
-#     res = list(ex.map(get_single_book_detail, tasks[:100]))
-#
-# lst_book_detail.extend(res)
-#
-# with open(file_path, 'w') as f:
-#     json.dump(lst_book_detail, f)
+    if os.path.exists(file_path):
+        with open(file_path, 'r') as f:
+            lst_book_detail = json.load(f)
+            downloaded_id = set([i['id'] for i in lst_book_detail])
+    else:
+        downloaded_id = set()
+        lst_book_detail = []
+
+    tasks = [b for b in lst_books if b['id'] not in downloaded_id]
+    print('Remaining task count:', len(tasks))
+
+    with ThreadPoolExecutor(max_workers=1) as ex:
+        res = list(ex.map(get_single_book_detail, tasks[:10]))
+
+    lst_book_detail.extend(res)
+
+    with open(file_path, 'w') as f:
+        json.dump(lst_book_detail, f)
